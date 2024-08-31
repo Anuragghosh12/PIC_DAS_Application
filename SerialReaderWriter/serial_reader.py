@@ -1,3 +1,4 @@
+import subprocess
 import time
 import serial
 import openpyxl
@@ -7,7 +8,11 @@ from openpyxl import Workbook
 class SerialReader:
     """Initializing the serial port and workbook"""
     def __init__(self, port, baudrate=38400, timeout=1):
-        self.ser = serial.Serial(port=port, baudrate=baudrate, timeout=timeout)
+        if port:
+            self.ser = serial.Serial(port=port, baudrate=baudrate, timeout=timeout)
+        else:
+            self.proc = subprocess.Popen(['python','mock_serial_device.py'], stdout=subprocess.PIPE, text=True)
+            self.ser = self.proc.stdout
         self.wb = Workbook()
         self.ws = self.wb.active
         self.ws.append(["Serial Number", "Channel 0", "Channel 1", "Channel 2", "Channel 3"])
@@ -30,7 +35,9 @@ class SerialReader:
     def read_and_store_serial_data(self):
         try:
             while True:
-                if self.ser.in_waiting > 0:
+                #Wait for the serial input
+                while self.ser.in_waiting==0:
+                    time.sleep(0.05) #Adding a short delay in between
                     try:
                         serial_data = self.ser.readline().decode('utf-8', errors='ignore').strip()
                     except UnicodeDecodeError as e:
