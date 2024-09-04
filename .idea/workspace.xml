@@ -4,14 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="87d5c27c-8d94-4e8f-bc31-6345914d63dd" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/SerialReaderWriter/auto_port_detection.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mock_serial_device.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/SerialReaderWriter/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/SerialReaderWriter/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/SerialReaderWriter/serial_reader.py" beforeDir="false" afterPath="$PROJECT_DIR$/SerialReaderWriter/serial_reader.py" afterDir="false" />
-    </list>
+    <list default="true" id="87d5c27c-8d94-4e8f-bc31-6345914d63dd" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
