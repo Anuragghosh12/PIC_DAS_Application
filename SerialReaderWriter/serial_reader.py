@@ -7,12 +7,11 @@ from openpyxl import Workbook
 
 class SerialReader:
     """Initializing the serial port and workbook"""
-    def __init__(self, port, baudrate=38400, timeout=1):
-        if port:
-            self.ser = serial.Serial(port=port, baudrate=baudrate, timeout=timeout)
-        else:
-            self.proc = subprocess.Popen(['python','mock_serial_device.py'], stdout=subprocess.PIPE, text=True)
-            self.ser = self.proc.stdout
+    def __init__(self, serial_conn, num_channels=4, retry_attempts=3, retry_delay=0.00001):
+        self.ser = serial_conn
+        self.num_channels=num_channels
+        self.retry_attempts = retry_attempts
+        self.retry_delay = retry_delay
         self.wb = Workbook()
         self.ws = self.wb.active
         self.ws.append(["Serial Number", "Channel 0", "Channel 1", "Channel 2", "Channel 3"])
@@ -20,11 +19,18 @@ class SerialReader:
     def is_valid_data(self, data):
         """Check if the data is valid and corresponds to the expected format."""
         try:
+            parts = data.split()
+            if(len(parts) < (self.num_channels+1)): #total channels + serial number
+                raise ValueError("Incomplete Data Received")
             # Attempt to convert each value to float or handle underscores as None
-            [None if value.strip('_') == '' else float(value) for value in data.split()]
-            return True
-        except ValueError:
-            return False
+            #[None if value.strip('_') == '' else float(value) for value in data.split()]
+            parsed_data = [None if '_' in part else part for part in parts]
+
+            parsed_data = [float(value) if value and value != 'None' else None for value in parsed_data]
+            return parsed_data
+        except (ValueError,IndexError) as e:
+            print(f"Invalid Serial Data:{data}.....Error: {e}")
+            return None
 
     def convert_to_float(self, value):
         try:
@@ -34,10 +40,11 @@ class SerialReader:
 
     def read_and_store_serial_data(self):
         try:
+            retry_count = 0
             while True:
                 #Wait for the serial input
-                while self.ser.in_waiting==0:
-                    time.sleep(0.05) #Adding a short delay in between
+                while self.ser.in_waiting>0:
+                    #time.sleep(0.05) #Adding a short delay in between
                     try:
                         serial_data = self.ser.readline().decode('utf-8', errors='ignore').strip()
                     except UnicodeDecodeError as e:
@@ -46,7 +53,12 @@ class SerialReader:
                     if "battery" in serial_data.lower():
                         print(f"{serial_data}")
                         print("Reset detected, stopping data capture.")
-                        continue
+                        return True
+                        #continue
+
+
+                    parsed_data = self.is_valid_data(serial_data)
+
 
                     # Handle header row (usually starting with "Serial Number" or similar)
                     # if serial_data.lower().startswith("serial number"):
@@ -56,24 +68,30 @@ class SerialReader:
                     #     print(f"Header: {header}")
                     #     continue
 
+
+
                     # Process data row if it's valid
-                    if self.is_valid_data(serial_data):
-                        data = serial_data.split()
+                    if parsed_data:
 
-                        # Replace underscores with None for closed channels
-                        data = [self.convert_to_float(value) for value in data]
-                        # data = [None if value.strip('_') == '' else value for value in data]
 
-                        self.ws.append(data)
+                        self.ws.append(parsed_data)
                         self.wb.save("Serial_data.xlsx")
-                        print(f"Data: {data}")
+                        print(f"Data: {parsed_data}")
+                        retry_count = 0
                     else:
-                        print(f"Invalid serial data: {serial_data}")
-                        self.read_and_store_serial_data()
+                        # print(f"Invalid serial data, retrying....{retry_count+1}/{self.retry_attempts}")
+                        # retry_count = 1
+                        # if retry_count>=self.retry_attempts:
+                        #     print("Skipping line")
+                        #     retry_count=0
+                        if "not responding" in serial_data.lower():
+                            return True
+                        #self.read_and_store_serial_data()
+                        #time.sleep(self.retry_delay)#wait before retrying
 
         except Exception as e:
             print(f"Data capture stopped due to error: {e}")
+            return True
 
         finally:
-            self.ser.close()
-            print("Serial connection closed.")
+            return True

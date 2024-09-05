@@ -3,8 +3,8 @@ import serial
 
 
 class SerialWriter:
-    def __init__(self, port, baudrate=38400, timeout=1):
-        self.ser = serial.Serial(port=port, baudrate=baudrate, timeout=timeout)
+    def __init__(self, serial_conn):
+        self.ser = serial_conn
 
     def send_data_to_serial(self,data):
         """Send data to the serial port to control the device."""
@@ -15,4 +15,5 @@ class SerialWriter:
         except Exception as e:
             print(f"An error occurred: {e}")
         finally:
-            self.ser.close()
+
+            print(f"Data Written Successfully ")
