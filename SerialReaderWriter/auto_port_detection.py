@@ -18,8 +18,16 @@ def find_device_port(baudrate=38400, timeout=1):
             print(f"Permission denied for port{port_name}")
 
     if serial_ports:
-        print(f"Available ports : {serial_ports}")
-        return serial_ports
+        preferred_ports=[port for port in serial_ports if port not in ['COM3', 'COM1']]
+        if preferred_ports:
+            print(f"Connected to port {preferred_ports[0]}")
+            return preferred_ports[0]
+        if 'COM3' in serial_ports:
+            print(f"Connected to port COM3")
+            return 'COM3'
+        if 'COM1' in serial_ports:
+            print(f"Connected to port COM1")
+            return 'COM1'
     else:
         print(f"No available ports found")
         return None

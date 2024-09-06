@@ -5,7 +5,7 @@ from SerialReaderWriter.auto_port_detection import find_device_port
 
 
 def main():
-    port =find_device_port()[-1]
+    port =find_device_port()
 
     if not port:
         print("No device connected, exiting the application")

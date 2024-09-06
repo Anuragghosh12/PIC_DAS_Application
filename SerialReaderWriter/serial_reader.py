@@ -73,12 +73,14 @@ class SerialReader:
             # Process any remaining data in the buffer
             if self.buffer:
                 self._process_buffer()
+                return True
+
 
     def _process_buffer(self):
         """Process and clear the buffer."""
         for data in self.buffer:
             self.ws.append(data)
-            print(f"Processing Data: {data}")
+            #print(f"Processing Data: {data}")
 
         self.wb.save("Serial_data.xlsx")
         self.buffer = []  # Clear the buffer
