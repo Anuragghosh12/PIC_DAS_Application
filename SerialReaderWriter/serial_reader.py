@@ -1,10 +1,8 @@
 import time
 import serial
-import openpyxl
 from openpyxl import Workbook
 
 BUFFER_SIZE = 200  # Number of lines to buffer
-
 
 class SerialReader:
     """Initializing the serial port and workbook"""
@@ -75,7 +73,6 @@ class SerialReader:
                 self._process_buffer()
                 return True
 
-
     def _process_buffer(self):
         """Process and clear the buffer."""
         for data in self.buffer:
@@ -84,4 +81,3 @@ class SerialReader:
 
         self.wb.save("Serial_data.xlsx")
         self.buffer = []  # Clear the buffer
-
