@@ -20,7 +20,7 @@ def main():
 
             if user_input == 'r':
                 reset_detected = reader.read_and_store_serial_data()
-                if reset_detected:
+                if not "Stopped" in reset_detected:
                     print("Restarting Program")
             elif user_input == 'w':
                 data = input('Enter data to send to serial: ')

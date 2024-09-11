@@ -1,1 +1,0 @@
-List of requirements/procedure to make the project work in local environment

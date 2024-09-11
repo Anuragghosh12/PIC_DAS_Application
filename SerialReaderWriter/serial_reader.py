@@ -40,12 +40,15 @@ class SerialReader:
                 if self.ser.in_waiting > 0:
                     serial_data = self.ser.readline().decode('utf-8', errors='ignore').strip()
 
+                    # Detect reset keyword and stop capture
                     if "battery" in serial_data.lower():
                         print(f"{serial_data}")
                         print("Reset detected, stopping data capture.")
-                        return True  # Indicate a reset detected
+                        return "Stopped" # Exit the function, stopping data capture
 
                     parsed_data = self.is_valid_data(serial_data)
+                    if (parsed_data != None and len(parsed_data) > 4):
+                        parsed_data = parsed_data[len(parsed_data)-5:]  # Get the last 5 elements
 
                     if parsed_data:
                         # Buffer the data
@@ -55,7 +58,8 @@ class SerialReader:
                         if len(self.buffer) >= BUFFER_SIZE:
                             self._process_buffer()
 
-                        print(f"Buffered Data: {parsed_data}")
+                        print(f"Buffered Data: {parsed_data}")  # This will print in the terminal
+                        yield parsed_data  # Yield the valid parsed data
 
                     else:
                         print(f"Skipping invalid data: {serial_data}")
@@ -65,19 +69,18 @@ class SerialReader:
 
         except Exception as e:
             print(f"Data capture stopped due to error: {e}")
-            return True
+            return "Stopped" # Stop capturing due to error
 
         finally:
             # Process any remaining data in the buffer
             if self.buffer:
                 self._process_buffer()
-                return True
+            return "Stopped"
 
     def _process_buffer(self):
         """Process and clear the buffer."""
         for data in self.buffer:
             self.ws.append(data)
-            #print(f"Processing Data: {data}")
 
         self.wb.save("Serial_data.xlsx")
         self.buffer = []  # Clear the buffer

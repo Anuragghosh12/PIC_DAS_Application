@@ -1,0 +1,44 @@
+<ScrollLabel@Label>:
+    size_hint_y: None
+    height: self.texture_size[1]
+
+BoxLayout:
+    orientation: 'vertical'
+
+    ScrollView:
+        id: data_output_scroll
+        do_scroll_x: False
+        do_scroll_y: True
+        size_hint_y: 0.7
+
+        GridLayout:
+            id: data_output_grid
+            cols: 1
+            spacing: 10
+            size_hint_y: None
+            height: self.minimum_height
+
+    BoxLayout:
+        size_hint_y: 0.1
+
+        Button:
+            text: 'Read Data'
+            on_press: app.start_reading()
+
+    BoxLayout:
+        size_hint_y: 0.1
+
+        TextInput:
+            id: write_input
+            hint_text: 'Enter data to send'
+
+        Button:
+            text: 'Send Data'
+            on_press: app.send_data()
+
+    BoxLayout:
+        size_hint_y: 0.1
+
+        Button:
+            text: 'Quit'
+            on_press: app.stop_app()
