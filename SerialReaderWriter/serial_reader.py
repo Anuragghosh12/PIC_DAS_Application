@@ -40,15 +40,17 @@ class SerialReader:
                 if self.ser.in_waiting > 0:
                     serial_data = self.ser.readline().decode('utf-8', errors='ignore').strip()
 
+                    parsed_data = self.is_valid_data(serial_data)
+                    if parsed_data != None and len(parsed_data) > 4:
+                        parsed_data = parsed_data[len(parsed_data)-5:]  # Get the last 5 elements
+                    # if parsed_data[0]:
+                    #     parsed_data[0] = int(parsed_data[0])
+
                     # Detect reset keyword and stop capture
                     if "battery" in serial_data.lower():
-                        print(f"{serial_data}")
-                        print("Reset detected, stopping data capture.")
-                        return "Stopped" # Exit the function, stopping data capture
-
-                    parsed_data = self.is_valid_data(serial_data)
-                    if (parsed_data != None and len(parsed_data) > 4):
-                        parsed_data = parsed_data[len(parsed_data)-5:]  # Get the last 5 elements
+                        yield parsed_data
+                        yield "Reset detected, stopping data capture."
+                        return "Stopped"  # Exit the function, stopping data capture
 
                     if parsed_data:
                         # Buffer the data
@@ -82,5 +84,5 @@ class SerialReader:
         for data in self.buffer:
             self.ws.append(data)
 
-        self.wb.save("Serial_data.xlsx")
+        self.wb.save("Serial_data2.xlsx")
         self.buffer = []  # Clear the buffer

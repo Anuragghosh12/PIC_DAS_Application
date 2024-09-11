@@ -9,6 +9,9 @@ import serial
 import serial_reader as sr
 import serial_writer as sw
 from auto_port_detection import find_device_port
+import threading
+from collections import deque
+import time
 
 kivy.require('2.1.0')
 
@@ -18,6 +21,9 @@ class MyApp(App):
         self.reader = None
         self.writer = None
         self.reading = False
+
+        # Buffer to store incoming data, with max length of 100 samples
+        self.data_buffer = deque(maxlen=100)
 
         layout = BoxLayout(orientation='vertical')
 
@@ -52,48 +58,55 @@ class MyApp(App):
         return layout
 
     def start_reading(self, instance):
-        """Start reading from the serial port."""
+        """Start reading from the serial port using a separate thread."""
         if self.serial_conn:
             if not self.reading:
                 self.reading = True
-                # Schedule the reading to happen continuously every 0.1 seconds
-                self.read_event = Clock.schedule_interval(self.read_and_store_data, 0.01)
+                # Start a new thread for reading data
+                self.read_thread = threading.Thread(target=self.read_data_thread)
+                self.read_thread.daemon = True  # Daemonize thread to exit when main thread exits
+                self.read_thread.start()
+                # Update the UI every 0.25 seconds to prevent UI overload
+                self.ui_update_event = Clock.schedule_interval(self.update_ui, 0.25)
         else:
             self.data_output.text = "Serial connection not established."
             self.reset_serial_connection()
 
+    def read_data_thread(self):
+        """Thread to handle reading from the serial port."""
+        while self.reading:
+            try:
+                data = next(self.reader.read_and_store_serial_data())
+                if not "Stopped" in data:
+                    # Add data to the buffer (deque)
+                    self.data_buffer.append(data)
+                else:
+                    self.stop_reading()
+                    Clock.schedule_once(lambda dt: self.reset_serial_connection(), 0)
+            except StopIteration:
+                pass  # No new data, continue
+            except Exception as e:
+                Clock.schedule_once(lambda dt: self.data_output.text == f"Error reading data: {e}", 0)
+                self.stop_reading()
+                Clock.schedule_once(lambda dt: self.reset_serial_connection(), 0)
+
+            # Throttle reading to approximately 20 samples per second (50 ms)
+            time.sleep(0.05)
+
     def stop_reading(self):
         """Stop reading from the serial port."""
-        if self.reading:
-            self.reading = False
-            if hasattr(self, 'read_event'):
-                self.read_event.cancel()
-                del self.read_event
-
-    def read_and_store_data(self, dt):
-        """Fetch one line of serial data and update the UI."""
-        if self.reader:
-            try:
-                # Read data using the generator
-                try:
-                    data = next(self.reader.read_and_store_serial_data())
-                    if not "Stopped" in data:
-                        self.update_data_output(data)
-                    else:
-                        self.stop_reading()
-                        self.reset_serial_connection()
-                except StopIteration:
-                    pass  # Continue to the next cycle
-            except Exception as e:
-                self.data_output.text = f"Error reading data: {e}"
-                self.stop_reading()
-                self.reset_serial_connection()
+        self.reading = False
+        if hasattr(self, 'ui_update_event'):
+            self.ui_update_event.cancel()
 
     def send_data(self, instance):
         """Send data to the serial port."""
         if self.writer:
             data = self.write_input.text
-            self.writer.send_data_to_serial(data)
+            if data.lower() != 'clear':
+                self.writer.send_data_to_serial(data)
+            else:
+                self.update_data_output('clear')
             self.write_input.text = ''  # Clear the input field
 
     def stop_app(self, instance):
@@ -113,15 +126,25 @@ class MyApp(App):
                 self.serial_conn = serial.Serial(port=port, baudrate=38400, timeout=1)
                 self.reader = sr.SerialReader(self.serial_conn)
                 self.writer = sw.SerialWriter(self.serial_conn)
-                self.data_output.text = "Connection established. Awaiting data..."
+                self.data_output.text += "\nConnection established. Awaiting data..."
+                self.data_output._scroll_y = 0  # Scroll to the bottom
             except serial.SerialException as e:
-                print(f"Error accessing serial port: {e}")
+                print(f"Error accessing serial port: ")
+
+    def update_ui(self, dt):
+        """Update the data output with new data from the buffer."""
+        while self.data_buffer:
+            new_data = self.data_buffer.popleft()  # Get the latest data
+            self.update_data_output(new_data)
 
     def update_data_output(self, new_data):
         """Update the data output with new data in real-time."""
-        formatted_data = ' '.join(map(str, new_data))  # Format the data into a string
-        self.data_output.text += f'\n{formatted_data}'  # Append new data to the text input
-        self.data_output._scroll_y = 0  # Scroll to the bottom
+        if new_data != 'clear':
+            formatted_data = ' '.join(map(str, new_data))  # Format the data into a string
+            self.data_output.text += f'\n{formatted_data}'  # Append new data to the text input
+            self.data_output._scroll_y = 0  # Scroll to the bottom
+        else:
+            self.data_output.text = ""  # Clear the screen
 
 if __name__ == "__main__":
     MyApp().run()
