@@ -5,15 +5,18 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
 from kivy.clock import Clock
+from kivy.properties import StringProperty
+from kivy.core.window import Window
+
 import serial
 import serial_reader as sr
 import serial_writer as sw
 from auto_port_detection import find_device_port
 import threading
 from collections import deque
-import time
 
 kivy.require('2.1.0')
+
 
 class MyApp(App):
     def build(self):
@@ -21,18 +24,20 @@ class MyApp(App):
         self.reader = None
         self.writer = None
         self.reading = False
-
-        # Buffer to store incoming data, with max length of 100 samples
-        self.data_buffer = deque(maxlen=100)
+        Window.clearcolor=(1, 1, 1, 1)
+        # Buffer to store incoming data
+        self.data_buffer = deque()
 
         layout = BoxLayout(orientation='vertical')
 
         # ScrollView to allow scrolling
-        scroll_view = ScrollView(size_hint=(1, 0.7))
+        scroll_view = ScrollView(size_hint=(1, 0.7), do_scroll_x=False)
         layout.add_widget(scroll_view)
+
 
         # TextInput for showing received data
         self.data_output = TextInput(text='No data received yet.', readonly=True, size_hint_y=None, height=400, multiline=True)
+        self.data_output.bind(minimum_height=self.data_output.setter('height'))  # Allow TextInput to resize based on content
         scroll_view.add_widget(self.data_output)
 
         # Button to start reading data
@@ -66,8 +71,8 @@ class MyApp(App):
                 self.read_thread = threading.Thread(target=self.read_data_thread)
                 self.read_thread.daemon = True  # Daemonize thread to exit when main thread exits
                 self.read_thread.start()
-                # Update the UI every 0.25 seconds to prevent UI overload
-                self.ui_update_event = Clock.schedule_interval(self.update_ui, 0.25)
+                # Update the UI every 0.01 seconds to prevent UI overload
+                self.ui_update_event = Clock.schedule_interval(self.update_ui, 0.01)
         else:
             self.data_output.text = "Serial connection not established."
             self.reset_serial_connection()
@@ -86,12 +91,9 @@ class MyApp(App):
             except StopIteration:
                 pass  # No new data, continue
             except Exception as e:
-                Clock.schedule_once(lambda dt: self.data_output.text == f"Error reading data: {e}", 0)
+                Clock.schedule_once(lambda dt: self.data_output.text == f"Error reading data", 0)
                 self.stop_reading()
                 Clock.schedule_once(lambda dt: self.reset_serial_connection(), 0)
-
-            # Throttle reading to approximately 20 samples per second (50 ms)
-            time.sleep(0.05)
 
     def stop_reading(self):
         """Stop reading from the serial port."""
@@ -127,7 +129,6 @@ class MyApp(App):
                 self.reader = sr.SerialReader(self.serial_conn)
                 self.writer = sw.SerialWriter(self.serial_conn)
                 self.data_output.text += "\nConnection established. Awaiting data..."
-                self.data_output._scroll_y = 0  # Scroll to the bottom
             except serial.SerialException as e:
                 print(f"Error accessing serial port: ")
 
@@ -142,7 +143,8 @@ class MyApp(App):
         if new_data != 'clear':
             formatted_data = ' '.join(map(str, new_data))  # Format the data into a string
             self.data_output.text += f'\n{formatted_data}'  # Append new data to the text input
-            self.data_output._scroll_y = 0  # Scroll to the bottom
+            # Automatically scroll to the bottom
+            self.data_output.cursor = (0, len(self.data_output.text))
         else:
             self.data_output.text = ""  # Clear the screen
 

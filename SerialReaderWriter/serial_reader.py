@@ -1,8 +1,12 @@
 import time
 import serial
 from openpyxl import Workbook
+from collections import deque
+import threading
 
-BUFFER_SIZE = 200  # Number of lines to buffer
+BUFFER_SIZE = 200  # Buffer size for permanent buffer
+TEMP_BUFFER_SIZE = 50  # Buffer size for temporary buffer
+
 
 class SerialReader:
     """Initializing the serial port and workbook"""
@@ -12,10 +16,12 @@ class SerialReader:
         self.num_channels = num_channels
         self.retry_attempts = retry_attempts
         self.retry_delay = retry_delay
-        self.buffer = []
+        self.buffer = deque(maxlen=BUFFER_SIZE)
+        self.temp_buffer = deque(maxlen=TEMP_BUFFER_SIZE)  # Temporary buffer for incoming data
         self.wb = Workbook()
         self.ws = self.wb.active
         self.ws.append(["Serial Number", "Channel 0", "Channel 1", "Channel 2", "Channel 3"])
+        self.lock = threading.Lock()
 
     def is_valid_data(self, data):
         """Check if the data is valid and corresponds to the expected format."""
@@ -39,28 +45,24 @@ class SerialReader:
                 # Check for incoming serial data
                 if self.ser.in_waiting > 0:
                     serial_data = self.ser.readline().decode('utf-8', errors='ignore').strip()
-
                     parsed_data = self.is_valid_data(serial_data)
-                    if parsed_data != None and len(parsed_data) > 4:
-                        parsed_data = parsed_data[len(parsed_data)-5:]  # Get the last 5 elements
-                    # if parsed_data[0]:
-                    #     parsed_data[0] = int(parsed_data[0])
 
-                    # Detect reset keyword and stop capture
+                    if parsed_data and len(parsed_data) > 4:
+                        parsed_data = parsed_data[len(parsed_data) - 5:]  # Get the last 5 elements
+
                     if "battery" in serial_data.lower():
-                        yield parsed_data
+                        self._process_temp_buffer()
                         yield "Reset detected, stopping data capture."
-                        return "Stopped"  # Exit the function, stopping data capture
+                        return "Stopped"
 
                     if parsed_data:
-                        # Buffer the data
-                        self.buffer.append(parsed_data)
+                        # Use lock to safely access the buffer
+                        with self.lock:
+                            self.temp_buffer.append(parsed_data)
+                            # Process the temporary buffer if it is full
+                            if len(self.temp_buffer) >= TEMP_BUFFER_SIZE:
+                                self._process_temp_buffer()
 
-                        # Process the buffer if it is full
-                        if len(self.buffer) >= BUFFER_SIZE:
-                            self._process_buffer()
-
-                        print(f"Buffered Data: {parsed_data}")  # This will print in the terminal
                         yield parsed_data  # Yield the valid parsed data
 
                     else:
@@ -71,18 +73,26 @@ class SerialReader:
 
         except Exception as e:
             print(f"Data capture stopped due to error: {e}")
-            return "Stopped" # Stop capturing due to error
-
-        finally:
-            # Process any remaining data in the buffer
-            if self.buffer:
-                self._process_buffer()
             return "Stopped"
 
+        finally:
+            if self.temp_buffer:
+                self._process_temp_buffer()
+            return "Stopped"
+
+    def _process_temp_buffer(self):
+        """Move data from temporary buffer to the main buffer and write to Excel."""
+        with self.lock:
+            while self.temp_buffer:
+                self.buffer.append(self.temp_buffer.popleft())  # Move data to the permanent buffer
+            # Process the buffer if it's full
+            if len(self.buffer) >= BUFFER_SIZE:
+                self._process_buffer()
+
     def _process_buffer(self):
-        """Process and clear the buffer."""
+        """Write the data from the main buffer to the Excel file and clear the buffer."""
         for data in self.buffer:
             self.ws.append(data)
 
         self.wb.save("Serial_data2.xlsx")
-        self.buffer = []  # Clear the buffer
+        self.buffer.clear()
