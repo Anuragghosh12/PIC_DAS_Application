@@ -2,7 +2,7 @@ import sys
 import serial
 import serial_reader as sr
 import serial_writer as sw
-from auto_port_detection import find_device_port
+from auto_port_detection_qt import find_device_port
 import threading
 from collections import deque
 
