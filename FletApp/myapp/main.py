@@ -1,11 +1,11 @@
 import flet as ft
+from flet import colors
 import serial
 import threading
 from collections import deque
 import serial_reader as sr
 import serial_writer as sw
 from auto_port_detection import find_device_port
-
 
 # Define your serial communication handler
 class SerialHandler:
@@ -29,11 +29,10 @@ class SerialHandler:
         """Thread to handle reading from the serial port."""
         while self.reading:
             try:
-                data = next(self.reader.read_and_store_serial_data())
+                data = next(self.reader.read_and_store_serial_data())  # Simulating data from the serial port
                 if data:
                     self.data_buffer.append(data)
                     if self.data_update_callback:
-                        # Use a queue to ensure thread-safe updates
                         self.data_update_callback(data)
             except Exception as e:
                 print(f"Error: {e}")
@@ -52,14 +51,18 @@ class SerialHandler:
         """Set the callback function to update UI."""
         self.data_update_callback = callback
 
-
 def main(page: ft.Page):
     # Set up serial connection
     port = find_device_port()
     serial_handler = SerialHandler(port)
 
     # Define UI components
-    data_list_view = ft.ListView(expand=True, spacing=10)
+    data_list_view = ft.ListView(
+        expand=True,
+        spacing=10,
+        height=page.height * 0.6,  # 60% of screen height
+        padding=10,
+    )
 
     # Queue for thread-safe UI updates
     data_update_queue = deque()
@@ -67,18 +70,15 @@ def main(page: ft.Page):
     # Function to update UI with data
     def update_data_output(data=None):
         if data:
-            # Append new data to the queue
             data_update_queue.append(data)
 
-        # Process the queue to update UI
         while data_update_queue:
             new_data_items = []
-            while len(data_update_queue) > 0:
+            while data_update_queue:
                 data_item = data_update_queue.popleft()
                 new_data_items.append(ft.Text(str(data_item), size=16))
 
             if new_data_items:
-                # Use batch update to minimize UI redraws
                 data_list_view.controls.extend(new_data_items)
                 page.update()
 
@@ -87,31 +87,28 @@ def main(page: ft.Page):
 
     # UI elements
     read_button = ft.ElevatedButton(text="Read Data", on_click=lambda e: serial_handler.start_reading())
-    write_input = ft.TextField(hint_text="Enter data to send")
+    write_input = ft.TextField(hint_text="Enter data to send", expand=True)
     write_button = ft.ElevatedButton(text="Send Data", on_click=lambda e: serial_handler.send_data(write_input.value))
 
     # Set up UI layout
     page.add(
         ft.Column(
             controls=[
-                ft.Container(
-                    content=data_list_view,
-                    padding=10,
-                    border_radius=5,
-                    border=ft.border.all(1, ft.colors.BLACK),
-                    expand=True
-                ),
-                read_button,
+                data_list_view,
                 write_input,
-                write_button
+                ft.Row(
+                    controls=[read_button, write_button],
+                    alignment=ft.MainAxisAlignment.CENTER
+                ),
             ],
-            expand=True
+            expand=True,
+            alignment=ft.MainAxisAlignment.CENTER
         )
     )
-
+    page.theme = ft.Theme(color_scheme_seed='orange')
+    page.update()
     # Center the window on the screen
     page.window_center()
-
 
 if __name__ == "__main__":
     ft.app(main)
